@@ -139,7 +139,7 @@ class Pip(object):
                 executor.map(
                     lambda x: _build(*x),
                     enumerate(
-                        package for package in packages if package["require_build"]
+                        package for package in packages if (package["require_build"]) and (not package['url'].startswith("file://"))
                     ),
                 )
             )
@@ -204,6 +204,7 @@ class Pip(object):
             file.write(json.dumps(metadata))
 
     def create(self, id_, packages, python, platform):
+        packages = [package for package in packages if not package['url'].startswith("file://")]
         prefix = self.micromamba.path_to_environment(id_)
         installation_marker = INSTALLATION_MARKER.format(prefix=prefix)
         metadata = self.metadata(id_, packages, python, platform)
@@ -226,6 +227,28 @@ class Pip(object):
             self._call(prefix, cmd)
         with open(installation_marker, "w") as file:
             file.write(json.dumps({"id": id_}))
+
+    def create_local(self, id_, packages, python, platform):
+        prefix = self.micromamba.path_to_environment(id_)
+        installation_marker = INSTALLATION_MARKER.format(prefix=f"{prefix}_local")
+        # install packages only if they haven't been installed before
+        if os.path.isfile(installation_marker):
+            return
+        # Pip can't install packages if the underlying virtual environment doesn't
+        # share the same platform
+        if self.micromamba.platform() == platform:
+            for package in packages:
+                cmd = [
+                    "install",
+                    "--progress-bar=off",
+                    "--quiet",
+                    "-e",
+                    package['url']
+                ]
+            
+                self._call(prefix, cmd)
+        # with open(installation_marker, "w") as file:
+        #     file.write(json.dumps({"id": id_}))
 
     def metadata(self, id_, packages, python, platform):
         # read the url to wheel mappings from a magic location
