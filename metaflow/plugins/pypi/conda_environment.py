@@ -171,26 +171,25 @@ class CondaEnvironment(MetaflowEnvironment):
                 results = list(
                     executor.map(lambda x: solve(*x, solver), environments(solver))
                 )
-            
+
             packages_non_local = [result for result in results[0][1] if result['url'].startswith("file://")]
 
             packages_local = [result for result in results[0][1] if result['url'].startswith("file://")]
 
             results_non_local = [[results[0][0], packages_non_local, results[0][2], results[0][3]]]
             results_local = [[results[0][0], packages_local, results[0][2], results[0][3]]]
-            
+
             _ = list(map(lambda x: self.solvers[solver].download(*x), results_non_local))
             with ThreadPoolExecutor() as executor:
                 _ = list(
                     executor.map(lambda x: self.solvers[solver].create(*x), results_non_local)
                 )
-
             if solver == 'pypi':
                 with ThreadPoolExecutor() as executor:
                     _ = list(
                         executor.map(lambda x: self.solvers[solver].create_local(*x), results_local)
                     )
-
+                
             if self.datastore_type not in ["local"]:
                 # Cache packages only when a remote datastore is in play.
                 storage = self.datastore(
