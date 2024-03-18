@@ -40,7 +40,6 @@ class Pip(object):
         self.micromamba = micromamba or Micromamba()
 
     def solve(self, id_, packages, python, platform):
-        print(f"[PIP] Solve Function: ID={id_}")
         prefix = self.micromamba.path_to_environment(id_)
         if prefix is None:
             msg = "Unable to locate a Micromamba managed virtual environment\n"
@@ -105,7 +104,6 @@ class Pip(object):
                 ]
 
     def download(self, id_, packages, python, platform):
-        print(f"[PIP] Download Function: ID={id_}")
         prefix = self.micromamba.path_to_environment(id_)
         metadata_file = METADATA_FILE.format(prefix=prefix)
         # download packages only if they haven't ever been downloaded before
@@ -206,7 +204,6 @@ class Pip(object):
             file.write(json.dumps(metadata))
 
     def create_local(self, id_, packages, python, platform):
-        print(f"[PIP] CreateLocal Function: ID={id_}")
         prefix = self.micromamba.path_to_environment(id_)
         installation_marker = INSTALLATION_MARKER.format(prefix=f"{prefix}")
         # Pip can't install packages if the underlying virtual environment doesn't
@@ -226,7 +223,6 @@ class Pip(object):
             file.write(json.dumps({"id": id_}))
 
     def create(self, id_, packages, python, platform):
-        print(f"[PIP] Create Function: ID={id_}")
         prefix = self.micromamba.path_to_environment(id_)
         installation_marker = INSTALLATION_MARKER.format(prefix=prefix)
         metadata = self.metadata(id_, packages, python, platform)

@@ -93,7 +93,6 @@ class CondaEnvironment(MetaflowEnvironment):
         def solve(id_, environment, type_):
             # Cached solve - should be quick!
             platform = environment["platform"]
-            # print("Solver - Read: ", self.read_from_environment_manifest([id_, platform, type_]))
             soo = self.solvers[type_].solve(id_, **environment)
             return (
                 id_,
@@ -171,18 +170,9 @@ class CondaEnvironment(MetaflowEnvironment):
         for solver in ["conda", "pypi"]:
             
             with ThreadPoolExecutor() as executor:
-                # envs = environments(solver)
-                # print(f"Envs: {list(envs)}")
                 results = list(
                     executor.map(lambda x: solve(*x, solver), environments(solver))
                 )
-                # print('results: ', results)
-            # packages_non_local = [result for result in results[0][1] if result['url'].startswith("file://")]
-
-            # packages_local = [result for result in results[0][1] if result['url'].startswith("file://")]
-
-            # results_non_local = [[results[0][0], packages_non_local, results[0][2], results[0][3]]]
-            # results_local = [[results[0][0], packages_local, results[0][2], results[0][3]]]
 
             _ = list(map(lambda x: self.solvers[solver].download(*x), results))
             with ThreadPoolExecutor() as executor:
@@ -193,7 +183,6 @@ class CondaEnvironment(MetaflowEnvironment):
             if solver ==  'conda':
                 
                 with ThreadPoolExecutor() as executor:
-                    print("RUNNING INSTALL LOCAL")
                     _ = list(
                         executor.map(lambda x: self.solvers[solver].install_local(*x), results)
                     )
