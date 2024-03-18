@@ -85,16 +85,29 @@ class Micromamba(object):
             for channel in self.info()["channels"] or ["conda-forge"]:
                 cmd.append("--channel=%s" % channel)
 
+            local_packages = []
             for package, version in packages.items():
-                cmd.append("%s==%s" % (package, version))
+                if os.path.isdir(package) is False:
+                    cmd.append("%s==%s" % (package, version))
+                else:
+                    local_packages.append((package))
+            
             if python:
                 cmd.append("python==%s" % python)
             # TODO: Ensure a human readable message is returned when the environment
             #       can't be resolved for any and all reasons.
-            return [
+                                
+            response = [
                 {k: v for k, v in item.items() if k in ["url"]}
                 for item in self._call(cmd, env)["actions"]["LINK"]
             ]
+            for package in local_packages:
+                response.append({'url': package})
+            
+
+
+            
+            return response
 
     def download(self, id_, packages, python, platform):
         # Unfortunately all the packages need to be catalogued in package cache
@@ -133,7 +146,8 @@ class Micromamba(object):
                 "--quiet",
             ]
             for package in packages:
-                cmd.append("{url}".format(**package))
+                if os.path.isdir(package['url']) is False:
+                    cmd.append("{url}".format(**package))
 
             self._call(cmd, env)
             # Perf optimization to skip cross-platform downloads.
@@ -142,8 +156,32 @@ class Micromamba(object):
                     f"{prefix}/fake.done", "w"
                 ).close()
             return
+        
+    def install_local(self, id_, packages, python, platform):
+
+
+        prefix = "{env_dirs}/{keyword}/{platform}/{id}".format(
+            env_dirs=self.info()["envs_dirs"][0],
+            platform=platform,
+            keyword="metaflow",  # indicates metaflow generated environment
+            id=id_,
+        )
+
+        for package in packages:
+            if os.path.isdir(package['url']) is True:
+                cmd = [
+                    "install",
+                    "--progress-bar=off",
+                    "--quiet",
+                    "-e",
+                    package['url']
+                ]
+
+                self._call_install(prefix, cmd)
+
 
     def create(self, id_, packages, python, platform):
+
         # create environment only if the platform matches system platform
         if platform != self.platform() or self.path_to_environment(id_, platform):
             return
@@ -171,7 +209,8 @@ class Micromamba(object):
             "--no-deps",  # important!
         ]
         for package in packages:
-            cmd.append("{url}".format(**package))
+            if os.path.isdir(package['url']) is False:
+                cmd.append("{url}".format(**package))
         self._call(cmd, env)
 
     def info(self):
@@ -216,6 +255,41 @@ class Micromamba(object):
 
     def platform(self):
         return self.info()["platform"]
+    
+    def _call_install(self, prefix, args):
+        try:
+            return (
+                subprocess.check_output(
+                    [
+                        self.bin,
+                        "run",
+                        "--prefix",
+                        prefix,
+                        "pip3",
+                        "--disable-pip-version-check",
+                        "--no-input",
+                        "--no-color",
+                    ]
+                    + args,
+                    stderr=subprocess.PIPE,
+                    env={
+                        **os.environ,
+                        # prioritize metaflow-specific env vars
+                        **{"PYTHONNOUSERSITE": "1"},  # no user installation!
+                    },
+                )
+                .decode()
+                .strip()
+            )
+        except subprocess.CalledProcessError as e:
+            raise MicromambaException(
+                "command '{cmd}' returned error ({code}) {output}\n{stderr}".format(
+                    cmd=" ".join(e.cmd),
+                    code=e.returncode,
+                    output=e.output.decode(),
+                    stderr=e.stderr.decode(),
+                )
+            )
 
     def _call(self, args, env=None):
         if env is None:

@@ -93,13 +93,15 @@ class CondaEnvironment(MetaflowEnvironment):
         def solve(id_, environment, type_):
             # Cached solve - should be quick!
             platform = environment["platform"]
+            # print("Solver - Read: ", self.read_from_environment_manifest([id_, platform, type_]))
+            soo = self.solvers[type_].solve(id_, **environment)
             return (
                 id_,
                 (
                     self.read_from_environment_manifest([id_, platform, type_])
                     or self.write_to_environment_manifest(
                         [id_, platform, type_],
-                        self.solvers[type_].solve(id_, **environment),
+                        soo,
                     )
                 ),
                 environment["python"],
@@ -167,27 +169,33 @@ class CondaEnvironment(MetaflowEnvironment):
         # First resolve environments through Conda, before PyPI.
         echo("Bootstrapping virtual environment(s) ...")
         for solver in ["conda", "pypi"]:
+            
             with ThreadPoolExecutor() as executor:
+                # envs = environments(solver)
+                # print(f"Envs: {list(envs)}")
                 results = list(
                     executor.map(lambda x: solve(*x, solver), environments(solver))
                 )
+                # print('results: ', results)
+            # packages_non_local = [result for result in results[0][1] if result['url'].startswith("file://")]
 
-            packages_non_local = [result for result in results[0][1] if result['url'].startswith("file://")]
+            # packages_local = [result for result in results[0][1] if result['url'].startswith("file://")]
 
-            packages_local = [result for result in results[0][1] if result['url'].startswith("file://")]
+            # results_non_local = [[results[0][0], packages_non_local, results[0][2], results[0][3]]]
+            # results_local = [[results[0][0], packages_local, results[0][2], results[0][3]]]
 
-            results_non_local = [[results[0][0], packages_non_local, results[0][2], results[0][3]]]
-            results_local = [[results[0][0], packages_local, results[0][2], results[0][3]]]
-
-            _ = list(map(lambda x: self.solvers[solver].download(*x), results_non_local))
+            _ = list(map(lambda x: self.solvers[solver].download(*x), results))
             with ThreadPoolExecutor() as executor:
                 _ = list(
-                    executor.map(lambda x: self.solvers[solver].create(*x), results_non_local)
+                    executor.map(lambda x: self.solvers[solver].create(*x), results)
                 )
-            if solver == 'pypi':
+
+            if solver ==  'conda':
+                
                 with ThreadPoolExecutor() as executor:
+                    print("RUNNING INSTALL LOCAL")
                     _ = list(
-                        executor.map(lambda x: self.solvers[solver].create_local(*x), results_local)
+                        executor.map(lambda x: self.solvers[solver].install_local(*x), results)
                     )
                 
             if self.datastore_type not in ["local"]:
@@ -195,7 +203,7 @@ class CondaEnvironment(MetaflowEnvironment):
                 storage = self.datastore(
                     _datastore_packageroot(self.datastore, self.echo)
                 )
-                cache(storage, results_non_local, solver)
+                cache(storage, results, solver)
         echo("Virtual environment(s) bootstrapped!")
 
     def executable(self, step_name, default=None):
