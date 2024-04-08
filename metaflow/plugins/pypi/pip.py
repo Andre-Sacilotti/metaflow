@@ -203,13 +203,30 @@ class Pip(object):
         with open(metadata_file, "w") as file:
             file.write(json.dumps(metadata))
 
+    def create_local(self, id_, packages, python, platform):
+        prefix = self.micromamba.path_to_environment(id_)
+        installation_marker = INSTALLATION_MARKER.format(prefix=f"{prefix}")
+        # Pip can't install packages if the underlying virtual environment doesn't
+        # share the same platform
+        if self.micromamba.platform() == platform:
+            for package in packages:
+                cmd = [
+                    "install",
+                    "--progress-bar=off",
+                    "--quiet",
+                    "-e",
+                    package['url']
+                ]
+
+                self._call(prefix, cmd)
+        with open(installation_marker, "w") as file:
+            file.write(json.dumps({"id": id_}))
+
     def create(self, id_, packages, python, platform):
         prefix = self.micromamba.path_to_environment(id_)
         installation_marker = INSTALLATION_MARKER.format(prefix=prefix)
         metadata = self.metadata(id_, packages, python, platform)
-        # install packages only if they haven't been installed before
-        if os.path.isfile(installation_marker):
-            return
+        
         # Pip can't install packages if the underlying virtual environment doesn't
         # share the same platform
         if self.micromamba.platform() == platform:
