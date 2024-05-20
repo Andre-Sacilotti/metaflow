@@ -155,7 +155,7 @@ class CondaEnvironment(MetaflowEnvironment):
                         url,
                     ),
                 )
-                for url, package in local_packages.items()
+                for url, package in local_packages.items() if os.path.isdir(package["path"]) == False
             ]
             storage.save_bytes(
                 list_of_path_and_filehandle,
